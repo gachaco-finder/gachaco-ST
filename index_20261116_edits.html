@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>最寄りのGachacoステーションを探します</title>
+<style>
+:root{
+  --bg:transparent; --panel:#ffffff; --ink:#1f2419; --muted:#5f6657;
+  --line:#e2e5dc; --accent:#2f3d0c; --warn:#9a3412;
+  --brand:#d1e158;
+  --brand-ink:#1f2a05;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  line-height:1.6}
+main{height:calc(100% - 6px);display:grid;grid-template-columns:minmax(340px,460px) 1fr;gap:20px;padding:20px;}
+.side{display:flex;flex-direction:column;min-height:0;overflow-y:auto;padding:4px 8px;}
+h1.title{margin:6px 0 14px;font-size:clamp(1.12rem,5vw,1.58rem);font-weight:800;line-height:1.25;letter-spacing:.01em;white-space:nowrap;padding-bottom:10px;border-bottom:4px solid var(--brand)}
+.title-main{display:inline-flex;align-items:center;gap:.3em}
+.title-icon{width:.95em;height:.95em;flex:0 0 auto}
+.title-sub{display:block;font-size:.55em;font-weight:700;color:var(--muted);letter-spacing:.08em;margin-bottom:2px}
+.lead{color:var(--muted);margin:0;font-size:.95rem}
+.head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px}
+.illust{flex:0 0 auto;width:104px;height:auto}
+@media (max-width:400px){.illust{width:84px}}
+.search{display:flex;flex-direction:column;gap:8px}
+.search input{width:100%;font:inherit;font-size:1rem;padding:12px 14px;border:2px solid var(--line);
+  border-radius:10px;background:var(--panel);color:var(--ink)}
+.search input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(195,215,44,.35)}
+.buttons{display:flex;gap:8px}
+.buttons button{flex:1}
+button{font:inherit;font-size:1rem;font-weight:600;padding:11px 16px;border-radius:10px;cursor:pointer;border:2px solid var(--accent)}
+button:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.primary:hover{filter:brightness(.95)}
+.secondary{background:var(--panel);border-color:var(--line);color:var(--ink)}
+button:disabled{opacity:.5;cursor:wait}
+.status{min-height:1.6em;margin:12px 0 4px;font-size:.9rem;color:var(--muted)}
+.status.error{color:var(--warn);font-weight:600}
+ol.results{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:10px}
+ol.results li{display:grid;grid-template-columns:40px 1fr;gap:2px 12px;align-items:start;
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.rank{grid-row:1 / span 3;width:34px;height:34px;border-radius:50%;background:var(--brand);color:var(--brand-ink);font-size:1.1rem;font-weight:700;display:grid;place-items:center}
+.name{font-weight:700;font-size:1.02rem}
+.addr{color:var(--muted);font-size:.86rem}
+.dist b{font-size:1.2rem}
+.dist a{margin-left:12px;font-size:.88rem;color:var(--accent);font-weight:600}
+.origin{font-size:.85rem;color:var(--muted);margin-top:12px}
+.note{font-size:.78rem;color:var(--muted);margin-top:auto;padding-top:18px}
+.mapwrap{border-radius:14px;overflow:hidden;background:var(--panel);border:1px solid var(--line);min-height:0}
+.mapwrap #map{width:100%;height:100%;background:#f7f8f5}
+/* 地図の淡さ:opacity を小さくするほど淡く、大きくするほど濃くなります(0〜1) */
+.leaflet-tile-pane{opacity:.92;filter:grayscale(10%) contrast(1.08)}
+.leaflet-container{font:inherit}
+.st-logo{width:28px;height:28px;border-radius:50%;background:#fff;border:1.5px solid #c9cec2;box-shadow:0 1px 4px rgba(0,0,0,.3);display:grid;place-items:center}
+.st-logo img{width:18px;height:18px;display:block}
+.st-rank{width:30px;height:30px;border-radius:50%;background:var(--brand);color:var(--brand-ink);border:2px solid #fff;
+  font-weight:800;font-size:15px;display:grid;place-items:center;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.origin-pin{width:30px;height:42px}
+.popup-name{font-weight:700;margin-bottom:2px}
+.popup-addr{color:#5f6657;font-size:.85em}
+.leaflet-container .popup a{color:#2f3d0c;font-weight:600}
+li.clickable{cursor:pointer}
+li.clickable:hover{border-color:var(--brand)}
+@media (max-width:820px){
+  html,body{height:auto}
+  main{height:auto;grid-template-columns:1fr;padding:16px}
+  .side{overflow:visible;padding:0}
+  .mapwrap #map{height:420px}
+}
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pmtiles@3.2.1/dist/pmtiles.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
+</head>
+<body>
+<main>
+  <section class="side">
+    <h1 class="title"><span class="title-sub">最寄りの</span><span class="title-main">Gachacoステーションを探します<svg class="title-icon" viewBox="0 0 32 32" aria-hidden="true"><circle cx="13.5" cy="13.5" r="9" fill="var(--brand)" stroke="currentColor" stroke-width="3.2"/><path d="M20.5 20.5 28 28" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg></span></h1>
+    <div class="head">
+      <p class="lead">住所を入力すると、近いステーションを3か所表示します。</p>
+    </div>
+
+    <div class="search">
+      <input id="q" type="text" placeholder="例:東京都千代田区丸の内1丁目" autocomplete="street-address" aria-label="住所">
+      <div class="buttons">
+        <button id="go" class="primary" disabled>検索</button>
+        <button id="here" class="secondary" disabled>現在地から探す</button>
+      </div>
+    </div>
+    <div id="status" class="status" role="status">ステーション一覧を読み込んでいます…</div>
+
+    <ol id="results" class="results"></ol>
+    <div id="origin" class="origin"></div>
+
+    <p class="note">距離は直線距離です。実際の道のりは「経路を見る」からGoogleマップでご確認ください。住所の位置検索と地図には国土地理院のサービス(地図:国土地理院最適化ベクトルタイル)を利用しています。</p>
+  </section>
+
+  <div class="mapwrap">
+    <div id="map" role="region" aria-label="ステーションの地図"></div>
+  </div>
+</main>
+
+<script>
+/* ===== 設定 ===== */
+// Apps Script をデプロイしたときの「ウェブアプリのURL」を "" の中に貼り付けてください。
+const API_URL = "";
+const MAP_ID = "1CwMfxbv2o277L7kjz0qKwipsjnJYVwk";
+// 予備のステーション一覧(Apps Script に接続できないときだけ使われます)
+const FALLBACK = [
+ {
+  "n": "Tokyo Public 西新宿第四 ST",
+  "a": "東京都新宿区西新宿2-4 (副都心街路10号線高架下)",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "ナップス 練馬店 ST",
+  "a": "東京都練馬区三原台3-25-18",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "Honda Dream 豊中 ST",
+  "a": "大阪府豊中市曽根西町2-19-19",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "ナップス 三鷹東八店 ST",
+  "a": "東京都三鷹市野崎1-19-12",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "ナップス 足立店 ST",
+  "a": "東京都足立区綾瀬7-2-17",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "エクシオグループ 平和島ビル ST",
+  "a": "東京都大田区平和島4-1-23",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "ジェームス 光が丘店 ST",
+  "a": "埼玉県和光市白子1-3-40",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "浪速区桜川 東洋テック 本社ビル ST",
+  "a": "大阪府大阪市浪速区桜川1-7-18",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "中央区道修町 武田御堂筋ビル ST",
+  "a": "大阪府大阪市中央区道修町4-1-1",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "板橋区立高島平温水プール ST",
+  "a": "東京都板橋区高島平8-27",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "読売新聞 茨木工場 ST",
+  "a": "大阪府茨木市横江1-7-1",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "葛飾区鎌倉 ST",
+  "a": "東京都葛飾区鎌倉3-57-1",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "ユアーズ・パーキング 三軒茶屋第５ ST",
+  "a": "東京都世田谷区三軒茶屋1-25-10",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "ドン・キホーテ 葛西店 ST",
+  "a": "東京都 江戸川区北葛西4-14-1",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "ヒルトップステージ瀬田 ST",
+  "a": "東京都世田谷区瀬田5-8-1",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "D-parking 服部元町２丁目第１ ST",
+  "a": "大阪府豊中市服部元町2-3-2",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "西武スマイルパーク 練馬西口第１ ST",
+  "a": "東京都練馬区練馬1-7-6",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "西武スマイルパーク 桜台第２ ST",
+  "a": "東京都練馬区桜台1-15",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "NPC24H 三崎町パーキング ST",
+  "a": "東京都千代田区神田三崎町3-6-6",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "D-parking 関町北２丁目第１ ST",
+  "a": "東京都練馬区関町北2-4-10",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "パラカ 大阪空港前第１ ST",
+  "a": "大阪府池田市空港1-5-18",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "武蔵野市桜堤 hocco ST",
+  "a": "東京都武蔵野市桜堤2-6-19",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "西東京市柳沢 MUFG PARK ST",
+  "a": "東京都西東京市柳沢4-4-40",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "セレパーク 木川西第３ ST",
+  "a": "大阪府大阪市淀川区木川西1-9-9",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "ライコランド TOKYO BAY 東雲 ST",
+  "a": "東京都江東区東雲2-7-12",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "T-REX 多摩調布本店 ST",
+  "a": "東京都調布市八雲台１丁目４−４",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "バイクショップベルウッド 京葉店 ST",
+  "a": "東京都江戸川区大杉1-2-11",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "TOBU PARK 五反野駅高架下駐輪場 ST",
+  "a": "東京都足立区足立3-34-6",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "GSパーク 板橋区役所前 ST",
+  "a": "東京都板橋区板橋2-61-7",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "城南信用金庫 六郷支店 ST",
+  "a": "東京都大田区東六郷3-2-10",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "城南信用金庫 池上支店 ST",
+  "a": "東京都大田区池上6-4-1",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "さわやか信用金庫 立会川支店 ST",
+  "a": "東京都品川区南大井4-2-5",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "板橋区立グリーンカレッジホール ST",
+  "a": "東京都板橋区志村3-32-6",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "Honda Dream 西東京 ST",
+  "a": "東京都西東京市西原町1-8-7",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "Honda Dream 世田谷 ST",
+  "a": "東京都世田谷区奥沢6-3-2",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "D-parking 狛江市和泉１丁目第1 ST",
+  "a": "東京都狛江市和泉本町1-10-11",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "カナモト 浜松町Kビル ST",
+  "a": "東京都港区芝大門1-7-7",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "さわやか信用金庫 世田谷支店 ST",
+  "a": "東京都世田谷区砧3-2-6",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "さわやか信用金庫 羽田支店 ST",
+  "a": "東京都大田区萩中2-2-1",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "町田市本町田 ST",
+  "a": "東京都町田市本町田82-1",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "東久留米市下里 ST",
+  "a": "東京都東久留米市下里6-2-31",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "足立区江北 ST",
+  "a": "東京都足立区江北6-4-10",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "町田駅森野第3自転車駐車場 ST",
+  "a": "東京都町田市森野1-1482-4",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "TOBU PARK 曳舟駅高架下第２駐車場 ST",
+  "a": "東京都墨田区東向島2-26-16",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "Honda Dream 新宿 ST",
+  "a": "東京都新宿区下落合4-1-2",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "ENEOS 学園金井SS ST",
+  "a": "東京都町田市金井ヶ丘1-2-39",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "西武スマイルパーク 下石神井４丁目 ST",
+  "a": "東京都練馬区下石神井4-28",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "中野区鷺宮 第二武蔵台ハイツ ST",
+  "a": "東京都中野区鷺宮6-28-31",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "Honda Dream 王子 ST",
+  "a": "東京都北区王子3-20-2",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "本田技研工業 朝霞 ST",
+  "a": "埼玉県朝霞市泉水3-15-1",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "スズキワールド 葛飾店 ST",
+  "a": "東京都葛飾区青戸8丁目2917",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "D-parking 神田佐久間町２丁目第1 ST",
+  "a": "東京都千代田区神田佐久間町2-6",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "スズキワールド 世田谷 ST",
+  "a": "東京都世田谷区八幡山2丁目24-9",
+  "s": "開設済み-開店中"
+ },
+ {
+  "n": "城北信用金庫 南千住支店 ST",
+  "a": "東京都荒川区南千住5-40-16",
+  "s": "開設済み-開店中"
+ }
+];
+/* ================ */
+
+const $ = id => document.getElementById(id);
+
+/* ===== 地図 ===== */
+let map = null, stationLayer = null, resultLayer = null, tiles = null, glLayer = null;
+
+/* ===== 地図の土台(国土地理院 最適化ベクトルタイル) ===== */
+const GSI_STYLE_URL = "https://gsi-cyberjapan.github.io/optimal_bvmap/style/std.json";
+// 表示しない地名の分類コード(210:大字・町名、212:同 補助、220:字・丁目名)
+// 区名・市名・駅名などはそのまま表示されます
+const HIDE_ANNO_CODES = [210, 212, 220];
+function hideTownNames(style){
+  const keep = ["!", ["in", ["get", "vt_code"], ["literal", HIDE_ANNO_CODES]]];
+  style.layers.forEach(l => {
+    if (l["source-layer"] !== "Anno" || !l.filter) return;
+    const f = l.filter;
+    if (Array.isArray(f) && f[0] === "step"){
+      // ズームで切り替わる条件の、それぞれの分岐に「町名以外」を足す
+      for (let k = 2; k < f.length; k += 2) f[k] = ["all", f[k], keep];
+    } else {
+      l.filter = ["all", f, keep];
+    }
+  });
+  return style;
+}
+// 地図記号(学校・郵便局などのマーク、国道番号など)を外す
+const ICON_ONLY_LAYERS = ["注記シンボル付き重なり", "注記道路番号", "水部表記線point"];
+function removeMapSymbols(style){
+  style.layers = style.layers.filter(l => !ICON_ONLY_LAYERS.includes(l.id));
+  style.layers.forEach(l => {
+    if (l.type === "symbol" && l.layout && "icon-image" in l.layout){
+      // 名前の文字は残し、マークだけ消す
+      Object.keys(l.layout).filter(k => k.startsWith("icon-")).forEach(k => delete l.layout[k]);
+      if (l.paint) Object.keys(l.paint).filter(k => k.startsWith("icon-")).forEach(k => delete l.paint[k]);
+    }
+  });
+  return style;
+}
+// 「標準地図」の配色を、淡色地図のような落ち着いた色に寄せる
+//  sat: 色みの残し具合(0=グレー, 1=元の色)/ white: 白に近づける割合(0〜1)
+const WATER_LAYERS = ["WA", "RvrCL", "WL", "Cstline", "WStrL", "WStrA"];
+function paleTone(layer){
+  const src = layer["source-layer"];
+  if (WATER_LAYERS.includes(src)) return { sat: .55, white: .2 };
+  if (layer.type === "symbol") return { sat: .45, white: .35 }; // 地名などの文字
+  if (layer.type === "fill") return { sat: .12, white: .55 };
+  if (src === "RdCL") return { sat: .12, white: .25 };
+  if (src === "BldA" || src === "StrctArea") return { sat: .1, white: .5 };
+  if (src === "RailCL" || src === "RailTrCL") return { sat: .4, white: .5 }; // 鉄道:黒→明るめのグレー
+  return { sat: .3, white: .3 };
+}
+function toPaleColors(style){
+  const re = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/;
+  const adjust = (c, t) => {
+    const m = re.exec(c);
+    if (!m) return c;
+    let r = +m[1], g = +m[2], b = +m[3];
+    const a = m[4] == null ? 1 : +m[4];
+    const y = .299 * r + .587 * g + .114 * b;
+    [r, g, b] = [r, g, b].map(v => { v = y + (v - y) * t.sat; return Math.round(v + (255 - v) * t.white); });
+    return `rgba(${r},${g},${b},${a})`;
+  };
+  const walk = (v, t) => typeof v === "string" ? adjust(v, t) : Array.isArray(v) ? v.map(x => walk(x, t)) : v;
+  style.layers.forEach(l => {
+    if (!l.paint || l.type === "background") return;
+    const t = paleTone(l);
+    Object.keys(l.paint).forEach(k => {
+      if (/color/.test(k) && !/halo/.test(k)) l.paint[k] = walk(l.paint[k], t);
+    });
+  });
+  return style;
+}
+function addRasterBase(){
+  tiles = L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png", {
+    maxZoom: 18, minZoom: 5,
+    attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院</a>'
+  }).addTo(map);
+}
+async function addBaseMap(){
+  try {
+    if (typeof maplibregl === "undefined" || typeof pmtiles === "undefined" || !L.maplibreGL) throw new Error("ベクトル地図のライブラリを読み込めませんでした");
+    const res = await fetch(GSI_STYLE_URL);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const style = toPaleColors(removeMapSymbols(hideTownNames(await res.json())));
+    maplibregl.addProtocol("pmtiles", new pmtiles.Protocol().tile);
+    glLayer = L.maplibreGL({
+      style,
+      preserveDrawingBuffer: true, // 印刷に地図を写すため
+      fadeDuration: 0,             // 地名をフェードさせず即表示(印刷で消えないように)
+      attribution: '<a href="https://github.com/gsi-cyberjapan/optimal_bvmap" target="_blank" rel="noopener">国土地理院最適化ベクトルタイル</a>'
+    }).addTo(map);
+  } catch (e) {
+    console.warn("ベクトル地図を使えないため、淡色地図で表示します:", e);
+    addRasterBase();
+  }
+}
+
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+function initMap(){
+  if (typeof L === "undefined"){ $("map").textContent = "地図を読み込めませんでした。"; return; }
+  map = L.map("map", { zoomControl: true }).setView([35.68, 139.76], 10);
+  addBaseMap();
+  stationLayer = L.layerGroup().addTo(map);
+  resultLayer = L.layerGroup().addTo(map);
+}
+function stationPopup(s, origin){
+  const dest = s.a ? encodeURIComponent(s.a.replace(/[((][^))]*[))]/g, "")) : s.lat + "," + s.lng;
+  const route = "https://www.google.com/maps/dir/?api=1" + (origin ? "&origin=" + origin.lat + "," + origin.lng : "") + "&destination=" + dest;
+  return `<div class="popup"><div class="popup-name">${esc(s.n)}</div><div class="popup-addr">${esc(s.a || "")}</div>
+    <a href="${route}" target="_blank" rel="noopener">経路を見る</a></div>`;
+}
+const STATION_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAK5klEQVR42u2b+Y8cxRXHP1XdPffsfR/G6xtjQ4wDQVgBRMghBQFCcSIcJMBKFOWHKPlX8lOUEAkpkEQokQAhQA4JJECMOSyQ8c2a9a7P9bEHO2cfVfmhp3sPrz3d9uwuFimppdHMbne9b736vu97r1porTVf4yH5mg9zqW6stWapnUsIgRDixu7RqC0QGNyISd1UHqCUCo0ODLdth4nJKS5NTjI5Nc1MoUilUsH13AatvKRSrXL3tjvYuG5NCPyyAqCUQkqJlD6NjF+8xPETXzD8xShnx8f5cqZA1bZRSgMagYAGOYYUgnKlyp23bwm9b9kACB4mpcRxHA4cPspHnx7g5NhpSuUKUgos08QwDDLpFA2zesEcmvJ5VvX3hVywLFsgWHWlFPv2f8o773/IufFxpJQkEwly2cw8PghWv9HEZ9s23Z0d5LLZ5QFg7qoPj5zk1T3/YmTsNAnLIpvJgNYorVFKLTlpCSFwPY++nm6EmF2UJQMgMF5pzetvvs3b7+1FA7lsprbKS2/0YnMa7O9d+iigtEYKQaFY5Pm/vcThY8PkshlEbTusxNBak7AS9Pd0By6xNAAExl+enOLZ5//KufELNOVzeJ7HSmlnIQSe59GUz9LZ0eF/xxIAoGvGT0xO8bvnXuDy5CS5bAbP81ZUtAjAcV06O9pJp5I3FP6umgsEwrBULvPHF17k8uQkmVQKz1Os+Kh5wEBvz7y5NtQDAlT//PdXOHP+PLlstiEr3wh5LARIKRno620YpuZicf7N/7zHgcNHaMrnr9v4QBoHmsDzvMasmGnSVyPARoBqztv3UnL67Dn2vPXOda+8lAKtwbZtHNfDMCSpZJJsJoNhyBvyINf1aG1por21pfEABCC8/MabeMojIaxYK+avOJTLVaQUDPT3sWndGoZWDdLR1komk8YwjBuMgSANiWmajd0Cget/8tkhPj8xQjabiRXnpfRXx3YcNm9YzwM77mH9mtU3RVpszo2vb727F9MyY628lJJqtUomnebHjz7MN7+xdR6ngJjVKo0gwkYDEKz+oWOfM3bmLNlM9NWXUlKpVOnqbOeZJ3bS3dnhk14tZb0Rjb5sHhC46b6PP0GK6BOWQlC1bTra2/jl00/S3JQPt9LNUw8CKYTg0sQEX4yOkUwmIq2+ADylSFoWu3ftnGf8zTZMgCPHhymWyuRz2WgASEmlVGLX44/Q09WJpxRGZOM1WquvFgDHhkdqMbo++QkhqFQqbFgzxLe2b0PFMr6WvgjjqwNAsVTi7PlxLMtCq2jsrzV8574d8YM4Ak8VmCp9WNtIK9uTEQjMs+fHmSkUMA0TXWdCfjnKYbC/lw1rh0L1GA00hRAGU8UPODD2U0zZhMZbMdOVtkknhjDPnBvHdT0s06Re+BdC4LgOWzdvCmuDccVOoXoIQ2QwzWa08lbIfImrZmjN3ot5/sLFyOrCr8ZYbFgzFF/Y1P62UD4EQqKVt4IeoNEo8qmtyMuTU0gh6+7GoBjZlM/T3Rm3GqMRSJSqULJPIEUCzcpFAo3CkGlyqS3ImUIBKaMZ4nkerS3NpFLJWA4QcEvZGaXqnkcIawUJUKC1Q8LsIpNcgyxXqkgp6+p/IQRKKZryubBmGKOSCUCxchTPK65oGBQIlK6STgxhyBzScZzIRKa1JpNKzTMqzpipHFzx0IcQKO2SS232pXCs8rbmuuSuqOUYxcoR3/31Ssd/SS51mw9A3Fw0fnHUF0CuN03ZHkGKZF29saQEqF1MI082ucEHwDCMyPm/EIJiuRSrHBUYW7JPYHuXV5wAlXZIWv2krH5fClumieO4dRlda40hDSanp+PV47UGAcXKMbR2kDKP1m7jVpToDVghJErZZJPrEcJCozDT6RTFUgkhrl0J0lpjmgYTE1NMz8zQ0tQUC4ip0vu43kztOV4DOc1EilR0r9IeudSW2meF2ZTPceHipUj/axgGM8UiI6On2Lb1tkgABCGvv+0pupoebVgI9HMLyXTpI05dfhbTyNZPs7VGCCskQBCYHW1tHB8eiZybSSHYf+Ag27beFisPaEpvX5JdXagcQesqkKu//3GxjFayyfXhlpC93V2RcwGlFKlUiqPHhxk9fSYUR1Hlp9ZeAy8XjWK69GGk0CoQaGWTSgySMDtnA+Jgfy8Jy4ql7JTWvPL6P2r/IyJFEYFECKNBl0QIE6UqlO2T0UKr8FPgbHJTbc4+D8ne7i5aW5pxXS+SS2utSSWTnBgd4+XX94R5xHIeOA1zC/sktnshRmjV5AMCDLZ0wrJYPThAHEmslCKbyfCfvR/wyhtvhn1ApdTyAFF7RqFyBE+VQqVZjzSlTIcSOIj7EmDrrRtjdxx8ENK89e5efv+nvzB+8ZJfEq/dWCkVAjJ7EUbtupeOQoCfxcwAO0gnhual8hJg/dohujo7YnmBb6Qmm81w9PgJfvuH53jptT2cOXfev3HtDOHcQ5SidlQw0iUi5BbVo5EJMCyBGU2hPIdaZyhhWdy97Q5e3fNPEpaFF4cQlSKdTuF5Hv/eu499+z9hoLeHNatXMdDXS3tbK7lMhkTCqjVNoktogSCZTCyaWzjeBGV7FCkTkQhQayd0/6A+CXM6Q/fedSf//eBjSuUycfKDAAQhRNhWGzl1ms9HRv1Dk5ZF0rKwLCtyJimFoGLbDK0aZPeunfMEVwBMqTqM417GkNmI1SU5qwDnlsUD8spmMjx0/w5efPm18DBU3BFogmQiQSo5ywWO62I7TuQsWEpJoVhk25bNYYQJt2YttyhUDqO0jSFydQOA1h6GkSWX3HRFLdMMHqi15t67tvPpwSOcGBklnU5d91G4hUflRcxGqRT+cdvVqwYWTcnD4kqkXqa//1PWAKnE4BW1TLkQ+Z889jCZTBrXdRva358fDa59eUqRSCTo7e66IvUWGGg8StVjfnG1LgFKtK6STa6rCSYFiwHgbwVNZ3sbT+58DLd2pme5DzkEZxVamvN0tLUuAMD3yKpzjopzBikS4XfXKuJo7c0mQAsAW+ABPh/cun4dT/7oMWzbwfOWt+srBLiuS3dnh9+umzPh4HOxehzXm0ZgRHE9hDDnZIBcHYBgGyiluPP2LTyzaydSCirV6g0dcIpbtfGUYqC396oSu1A55Gv5KNIdD9NoDktgC1WjvBoLK6XYeutGfvWzp+jr6WZmphj+ttRKX0rJQH/P4u5RA0AII4L8lyEBJqye+Sx6LQDmgtDf28Ovf/4033/wPt/9SqXw96XgB89TZNJpersWEmCtu6QrlKrDcwitXi/DJpvcWCNDr/4WWAiC1hrLsvjhdx/kN7/YzT3btyGEoFAshdLZl70NeIOr1n5ra2mmpblpHgCzGeBYzO6SWlQAzdMB9SYVCJqerk6eePwRHrpvB/sPHOTgkWOcv3gJ27YxpH9+zzCM635zTEqBrip6u7tqHqhn23Y1AVSqHkepCpbRGqG5KhfNAGMBsNAbNNDZ0c4PHryf7z3wbU6dPcfwyCgnx04zfvESM4UC1aqNp2aPxkZ9YUpKSaFQpK+3e57unzsmi3tx3IlQ4V0zA8TBMtrJJNdeIYBiAxB4g5gjaqSU3DLQzy0Dfo3dcVymvvySqelppqZnmCkWKZfL2I6D53qoOkVLgcB2XTatW3ulAKqxdyYxxED7bqRI19EANQWYGMQyWhclQGjAi5M36wuTDQNgcUC4oe7PtcDUqHi9RcE1BZP4/9vjX/PxP85AsM2kl8DBAAAAAElFTkSuQmCC";
+const STATION_ICON = (typeof L !== "undefined") ? L.divIcon({ className: "", html: `<div class="st-logo"><img src="${STATION_LOGO}" alt=""></div>`, iconSize: [28,28], popupAnchor: [0,-12] }) : null;
+function drawStations(){
+  if (!map) return;
+  stationLayer.clearLayers();
+  const pts = [];
+  stations.filter(s => s.lat != null).forEach(s => {
+    L.marker([s.lat, s.lng], { icon: STATION_ICON, title: s.n })
+      .bindPopup(stationPopup(s)).addTo(stationLayer);
+    pts.push([s.lat, s.lng]);
+  });
+  if (pts.length) map.fitBounds(pts, { padding: [30, 30] });
+}
+const ORIGIN_SVG = '<svg class="origin-pin" viewBox="0 0 30 42" xmlns="http://www.w3.org/2000/svg"><path d="M15 1C7.3 1 1 7.1 1 14.7 1 25 15 41 15 41s14-16 14-26.3C29 7.1 22.7 1 15 1z" fill="#1f2419" stroke="#fff" stroke-width="2"/><circle cx="15" cy="14.5" r="5.5" fill="#c3d72c"/></svg>';
+function drawResults(origin, originLabel, ranked){
+  if (!map) return;
+  resultLayer.clearLayers();
+  const markers = [];
+  L.marker([origin.lat, origin.lng], { icon: L.divIcon({ className: "", html: ORIGIN_SVG, iconSize: [30,42], iconAnchor: [15,41], popupAnchor: [0,-36] }), zIndexOffset: 1000 })
+    .bindPopup(`<div class="popup"><div class="popup-name">検索地点</div><div class="popup-addr">${esc(originLabel)}</div></div>`)
+    .addTo(resultLayer);
+  ranked.forEach((s, i) => {
+    const m = L.marker([s.lat, s.lng], { icon: L.divIcon({ className: "", html: `<div class="st-rank">${i + 1}</div>`, iconSize: [30,30] }), zIndexOffset: 900 - i })
+      .bindPopup(stationPopup(s, origin)).addTo(resultLayer);
+    markers.push(m);
+  });
+  map.fitBounds([[origin.lat, origin.lng], ...ranked.map(s => [s.lat, s.lng])], { padding: [50, 50], maxZoom: 16 });
+  return markers;
+}
+/* ===================================== */
+const statusEl = $("status");
+const CACHE_KEY = "gachaco-geo-v1";
+let cache = {};
+try { cache = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}"); } catch (e) { cache = {}; }
+function saveCache(){ try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch (e) {} }
+let stations = [];
+
+function setStatus(text, isError){
+  statusEl.textContent = text;
+  statusEl.classList.toggle("error", !!isError);
+}
+
+// 住所の表記ゆれを整える(全角数字・ハイフン、括弧書き、空白)
+function normalize(addr){
+  return addr
+    .replace(/[((][^))]*[))]/g, "")
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[−ー―‐-–—]/g, (m, i, s) => /\d/.test(s[i-1] || "") ? "-" : m)
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+async function geocode(addr){
+  const url = "https://msearch.gsi.go.jp/address-search/AddressSearch?q=" + encodeURIComponent(normalize(addr));
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  if (!data.length) return null;
+  const [lng, lat] = data[0].geometry.coordinates;
+  return { lat, lng, label: data[0].properties.title };
+}
+
+async function fetchLatest(){
+  if (!API_URL) return null;
+  try {
+    const res = await fetch(API_URL);
+    const data = await res.json();
+    if (data && Array.isArray(data.stations) && data.stations.length) return data.stations;
+    if (data && data.error) console.warn("Apps Script エラー:", data.error);
+  } catch (e) { console.warn("最新の一覧を取得できませんでした:", e); }
+  return null;
+}
+
+async function loadStations(){
+  setStatus("ステーション一覧を読み込んでいます…");
+  const latest = await fetchLatest();
+  const usingFallback = !latest;
+  stations = (latest || FALLBACK).map(s => ({ ...s }));
+
+  // 位置が入っていないステーションは国土地理院の住所検索で補う
+  stations.forEach(s => { if (s.lat == null && cache[s.a]) { s.lat = cache[s.a].lat; s.lng = cache[s.a].lng; } });
+  const todo = stations.filter(s => s.lat == null && s.a);
+  const total = todo.length;
+  let done = 0;
+  const worker = async () => {
+    while (todo.length){
+      const s = todo.shift();
+      try {
+        const g = await geocode(s.a);
+        if (g){ s.lat = g.lat; s.lng = g.lng; cache[s.a] = { lat: g.lat, lng: g.lng }; }
+      } catch (e) {}
+      done++;
+      setStatus(`ステーションの位置を読み込んでいます… ${done} / ${total}`);
+    }
+  };
+  if (total) { await Promise.all([worker(), worker(), worker(), worker()]); saveCache(); }
+
+  const ready = stations.filter(s => s.lat != null);
+  const missing = stations.length - ready.length;
+  if (!ready.length){
+    setStatus("ステーションの位置を読み込めませんでした。インターネットに接続されているか確認し、ページを再読み込みしてください。", true);
+    return;
+  }
+  $("go").disabled = false; $("here").disabled = false;
+  let msg = `${ready.length}か所のステーションから検索できます。`;
+  if (missing) msg += `(位置が特定できなかった${missing}か所は除外)`;
+  if (usingFallback && API_URL) msg = "最新の一覧を取得できなかったため、保存済みの一覧で検索します。" + msg;
+  setStatus(msg, usingFallback && !!API_URL);
+  drawStations();
+}
+
+function distanceKm(a, b){
+  const r = d => d * Math.PI / 180;
+  const dLat = r(b.lat - a.lat), dLng = r(b.lng - a.lng);
+  const h = Math.sin(dLat/2)**2 + Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLng/2)**2;
+  return 6371 * 2 * Math.asin(Math.sqrt(h));
+}
+
+function formatKm(km){ return km < 1 ? Math.round(km * 1000) + " m" : km.toFixed(1) + " km"; }
+
+function showNearest(origin, originLabel){
+  const ranked = stations
+    .filter(s => s.lat != null)
+    .map(s => ({ ...s, km: distanceKm(origin, s) }))
+    .sort((x, y) => x.km - y.km)
+    .slice(0, 3);
+  const ol = $("results");
+  ol.innerHTML = "";
+  ranked.forEach((s, i) => {
+    const li = document.createElement("li");
+    const dest = s.a ? encodeURIComponent(s.a.replace(/[((][^))]*[))]/g, "")) : s.lat + "," + s.lng;
+    const route = "https://www.google.com/maps/dir/?api=1&origin=" + origin.lat + "," + origin.lng + "&destination=" + dest;
+    const note = s.s && !/開店中/.test(s.s) ? `(${s.s})` : "";
+    li.innerHTML = `<div class="rank">${i + 1}</div>
+      <div class="name"></div>
+      <div class="addr"></div>
+      <div class="dist"><b>${formatKm(s.km)}</b><a target="_blank" rel="noopener">経路を見る</a></div>`;
+    li.querySelector(".name").textContent = s.n + note;
+    li.querySelector(".addr").textContent = s.a || "";
+    li.querySelector("a").href = route;
+    ol.appendChild(li);
+  });
+  $("origin").textContent = "検索地点:" + originLabel;
+  const markers = drawResults(origin, originLabel, ranked) || [];
+  [...ol.children].forEach((li, i) => {
+    if (!markers[i]) return;
+    li.classList.add("clickable");
+    li.addEventListener("click", e => {
+      if (e.target.closest("a")) return;
+      map.setView(markers[i].getLatLng(), Math.max(map.getZoom(), 15));
+      markers[i].openPopup();
+      if (window.matchMedia("(max-width:820px)").matches) $("map").scrollIntoView({ behavior: "smooth" });
+    });
+  });
+  setStatus("");
+}
+
+async function searchAddress(){
+  const q = $("q").value.trim();
+  if (!q){ setStatus("住所を入力してください。", true); return; }
+  $("go").disabled = true;
+  setStatus("住所を検索しています…");
+  try {
+    const g = await geocode(q);
+    if (!g){ setStatus("その住所が見つかりませんでした。都道府県から入力するか、番地を省いて試してください。", true); return; }
+    showNearest(g, g.label);
+  } catch (e) {
+    setStatus("住所検索に接続できませんでした。インターネット接続を確認してください。", true);
+  } finally { $("go").disabled = false; }
+}
+
+function searchHere(){
+  if (!navigator.geolocation){ setStatus("このブラウザでは現在地を取得できません。住所を入力してください。", true); return; }
+  setStatus("現在地を取得しています…");
+  navigator.geolocation.getCurrentPosition(
+    p => showNearest({ lat: p.coords.latitude, lng: p.coords.longitude }, "現在地"),
+    () => setStatus("現在地を取得できませんでした。位置情報の利用を許可するか、住所を入力してください。", true),
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+$("go").addEventListener("click", searchAddress);
+$("here").addEventListener("click", searchHere);
+$("q").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing && !$("go").disabled) searchAddress(); });
+initMap();
+loadStations();
+</script>
+</body>
+</html>
