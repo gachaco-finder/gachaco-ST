@@ -66,6 +66,9 @@ ol.results li{display:grid;grid-template-columns:40px 1fr;gap:2px 12px;align-ite
 .popup-name{font-weight:700;margin-bottom:2px}
 .popup-addr{color:#5f6657;font-size:.85em}
 .leaflet-container .popup a{color:#2f3d0c;font-weight:600}
+.summary{margin:4px 0 10px;padding:10px 14px;border-radius:10px;background:var(--panel);border:1px solid var(--line);font-size:.95rem}
+.summary b{font-size:1.25rem;margin:0 2px}
+.more-btn{width:100%;margin-top:10px;font-size:.95rem}
 li.clickable{cursor:pointer}
 li.clickable:hover{border-color:var(--brand)}
 @media (max-width:820px){
@@ -73,6 +76,47 @@ li.clickable:hover{border-color:var(--brand)}
   main{height:auto;grid-template-columns:1fr;padding:16px}
   .side{overflow:visible;padding:0}
   .mapwrap #map{height:420px}
+}
+/* ===== 印刷(A4横)===== */
+.print-btn{width:100%;margin-top:12px}
+.print-only{display:none}
+body.printing .print-only{display:block}
+.print-meta{display:none;justify-content:space-between;gap:4mm;font-size:.85em;color:var(--muted);margin:0 0 2mm}
+.print-overlay{position:fixed;inset:0;z-index:2000;display:grid;place-items:center;background:rgba(244,245,242,.92);font-weight:700;font-size:1.1rem}
+.print-overlay[hidden]{display:none}
+body.printing{background:var(--bg);width:297mm;height:209mm;margin:0;padding:10.5mm 10mm 0}
+body.printing main{width:277mm;height:188mm;padding:0;gap:5mm;grid-template-columns:minmax(0,1fr) var(--pmap,155mm);grid-template-rows:188mm}
+body.printing .mapwrap{border:0;border-radius:0;background:none}
+body.printing .mapwrap #map{width:var(--pmap,155mm);height:188mm;border:1px solid #c9cec2}
+body.printing .leaflet-control-zoom{display:none}
+.print-snapshot{display:none;position:absolute;left:0;top:0;pointer-events:none}
+body.printing .print-snapshot{display:block}
+body.printing.has-snapshot .maplibregl-canvas{visibility:hidden}
+body.printing .side{height:188mm;overflow:hidden;padding:0;font-size:var(--pfs,10pt)}
+body.printing .lead,body.printing .screen-only,body.printing .search,body.printing .status,body.printing .print-btn,body.printing .more-btn{display:none}
+body.printing .side{position:relative}
+body.printing h1.title{order:0;font-size:16pt;margin:0 0 2mm;padding:0 0 1.5mm 0;min-height:14mm;display:flex;flex-direction:column;justify-content:flex-end;border-bottom-width:1.2mm;white-space:normal}
+body.printing .head{position:absolute;top:0;right:0;margin:0;z-index:1}
+body.printing .illust{width:27mm;height:auto}
+body.printing .side > *{flex-shrink:0}
+body.printing .print-meta{order:1;display:flex}
+body.printing .origin{order:2;margin:0 0 2mm;font-size:1.05em;font-weight:700;color:var(--ink)}
+body.printing .summary{order:3;margin:0 0 2mm;padding:1.5mm 3mm;border-radius:2mm;font-size:1em}
+body.printing ol.results{order:4;margin:0;gap:.5em 1em;grid-template-columns:repeat(var(--pcols,1),minmax(0,1fr))}
+body.printing ol.results li{grid-template-columns:auto minmax(0,1fr) auto;gap:0 .6em;align-items:center;padding:.45em .7em;border-radius:.7em;break-inside:avoid}
+body.printing .rank{grid-column:1;grid-row:1 / span 2;width:1.9em;height:1.9em;font-size:.95em}
+body.printing .name{grid-column:2;grid-row:1;font-size:1em;line-height:1.35}
+body.printing .addr{grid-column:2;grid-row:2;font-size:.82em;line-height:1.35}
+body.printing .dist{grid-column:3;grid-row:1 / span 2;white-space:nowrap}
+body.printing .dist b{font-size:1.1em}
+body.printing .dist a{display:none}
+body.printing .note{order:5;font-size:7pt;padding-top:2mm}
+@page{size:A4 landscape;margin:0}
+@media print{
+  html{background:var(--bg)}
+  html,body{overflow:hidden}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .print-overlay{display:none!important}
 }
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -86,8 +130,9 @@ li.clickable:hover{border-color:var(--brand)}
 <main>
   <section class="side">
     <h1 class="title"><span class="title-sub">最寄りの</span><span class="title-main">Gachacoステーションを探します<svg class="title-icon" viewBox="0 0 32 32" aria-hidden="true"><circle cx="13.5" cy="13.5" r="9" fill="var(--brand)" stroke="currentColor" stroke-width="3.2"/><path d="M20.5 20.5 28 28" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg></span></h1>
+    <div class="print-meta"><span id="printmeta">直線距離・近い順</span></div>
     <div class="head">
-      <p class="lead">住所を入力すると、近いステーションを3か所表示します。</p>
+      <p class="lead">住所を入力すると、近いステーションを3か所表示します。半径10km以内のステーションをまとめて見ることもできます。</p>
     </div>
 
     <div class="search">
@@ -97,12 +142,16 @@ li.clickable:hover{border-color:var(--brand)}
         <button id="here" class="secondary" disabled>現在地から探す</button>
       </div>
     </div>
+    <button id="more" class="secondary more-btn" type="button" aria-expanded="false" hidden></button>
     <div id="status" class="status" role="status">ステーション一覧を読み込んでいます…</div>
 
+    <div id="summary" class="summary" hidden></div>
     <ol id="results" class="results"></ol>
     <div id="origin" class="origin"></div>
+    <button id="print" class="secondary print-btn" type="button" hidden>この結果をA4横で印刷</button>
 
-    <p class="note">距離は直線距離です。実際の道のりは「経路を見る」からGoogleマップでご確認ください。住所の位置検索と地図には国土地理院のサービス(地図:国土地理院最適化ベクトルタイル)を利用しています。</p>
+    <p class="note screen-only">距離は直線距離です。半径10km以内を表示しているときは、その範囲を地図上の円で示しています。実際の道のりは「経路を見る」からGoogleマップでご確認ください。住所の位置検索と地図には国土地理院のサービス(地図:国土地理院最適化ベクトルタイル)を利用しています。</p>
+    <p class="note print-only">距離は検索地点からの直線距離です。半径10km以内を表示しているときは、その範囲を地図上の円で示しています。地図:国土地理院最適化ベクトルタイル</p>
   </section>
 
   <div class="mapwrap">
@@ -110,11 +159,17 @@ li.clickable:hover{border-color:var(--brand)}
   </div>
 </main>
 
+<div id="printwait" class="print-overlay" role="status" hidden>印刷用に整えています…</div>
+
 <script>
 /* ===== 設定 ===== */
 // Apps Script をデプロイしたときの「ウェブアプリのURL」を "" の中に貼り付けてください。
 const API_URL = "";
 const MAP_ID = "1CwMfxbv2o277L7kjz0qKwipsjnJYVwk";
+// 最初に表示する件数
+const NEAREST_COUNT = 3;
+// 「まとめて表示」で探す半径(km)
+const RADIUS_KM = 10;
 // 予備のステーション一覧(Apps Script に接続できないときだけ使われます)
 const FALLBACK = [
  {
@@ -394,6 +449,8 @@ const $ = id => document.getElementById(id);
 
 /* ===== 地図 ===== */
 let map = null, stationLayer = null, resultLayer = null, tiles = null, glLayer = null;
+// 直近の検索結果を地図に合わせた範囲(印刷の前後で合わせ直すために使う)
+let lastBounds = null, lastPad = [50, 50], lastMaxZoom = 16;
 
 /* ===== 地図の土台(国土地理院 最適化ベクトルタイル) ===== */
 const GSI_STYLE_URL = "https://gsi-cyberjapan.github.io/optimal_bvmap/style/std.json";
@@ -489,7 +546,7 @@ async function addBaseMap(){
 function esc(s){ return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 function initMap(){
   if (typeof L === "undefined"){ $("map").textContent = "地図を読み込めませんでした。"; return; }
-  map = L.map("map", { zoomControl: true }).setView([35.68, 139.76], 10);
+  map = L.map("map", { zoomControl: true, zoomSnap: 0.25 }).setView([35.68, 139.76], 10);
   addBaseMap();
   stationLayer = L.layerGroup().addTo(map);
   resultLayer = L.layerGroup().addTo(map);
@@ -514,10 +571,13 @@ function drawStations(){
   if (pts.length) map.fitBounds(pts, { padding: [30, 30] });
 }
 const ORIGIN_SVG = '<svg class="origin-pin" viewBox="0 0 30 42" xmlns="http://www.w3.org/2000/svg"><path d="M15 1C7.3 1 1 7.1 1 14.7 1 25 15 41 15 41s14-16 14-26.3C29 7.1 22.7 1 15 1z" fill="#1f2419" stroke="#fff" stroke-width="2"/><circle cx="15" cy="14.5" r="5.5" fill="#c3d72c"/></svg>';
-function drawResults(origin, originLabel, ranked){
+function drawResults(origin, originLabel, ranked, showCircle){
   if (!map) return;
   resultLayer.clearLayers();
   const markers = [];
+  const circle = showCircle
+    ? L.circle([origin.lat, origin.lng], { radius: RADIUS_KM * 1000, color: "#2f3d0c", weight: 2, dashArray: "6 6", fillColor: "#c3d72c", fillOpacity: .12, interactive: false }).addTo(resultLayer)
+    : null;
   L.marker([origin.lat, origin.lng], { icon: L.divIcon({ className: "", html: ORIGIN_SVG, iconSize: [30,42], iconAnchor: [15,41], popupAnchor: [0,-36] }), zIndexOffset: 1000 })
     .bindPopup(`<div class="popup"><div class="popup-name">検索地点</div><div class="popup-addr">${esc(originLabel)}</div></div>`)
     .addTo(resultLayer);
@@ -526,7 +586,13 @@ function drawResults(origin, originLabel, ranked){
       .bindPopup(stationPopup(s, origin)).addTo(resultLayer);
     markers.push(m);
   });
-  map.fitBounds([[origin.lat, origin.lng], ...ranked.map(s => [s.lat, s.lng])], { padding: [50, 50], maxZoom: 16 });
+  if (circle){
+    // 10kmの円がちょうど収まる範囲に合わせる
+    lastBounds = circle.getBounds(); lastPad = [10, 10]; lastMaxZoom = 15;
+  } else {
+    lastBounds = L.latLngBounds([[origin.lat, origin.lng], ...ranked.map(s => [s.lat, s.lng])]); lastPad = [50, 50]; lastMaxZoom = 16;
+  }
+  map.fitBounds(lastBounds, { padding: lastPad, maxZoom: lastMaxZoom });
   return markers;
 }
 /* ===================================== */
@@ -620,15 +686,43 @@ function distanceKm(a, b){
 
 function formatKm(km){ return km < 1 ? Math.round(km * 1000) + " m" : km.toFixed(1) + " km"; }
 
+// 直近の検索結果(表示の切り替えに使う)
+let current = null;
+let wide = false;
+
 function showNearest(origin, originLabel){
   const ranked = stations
     .filter(s => s.lat != null)
     .map(s => ({ ...s, km: distanceKm(origin, s) }))
-    .sort((x, y) => x.km - y.km)
-    .slice(0, 3);
+    .sort((x, y) => x.km - y.km);
+  current = { origin, originLabel, ranked };
+  wide = false;
+  render();
+  setStatus("");
+}
+
+function render(){
+  if (!current) return;
+  const { origin, originLabel, ranked } = current;
+  const inside = ranked.filter(s => s.km <= RADIUS_KM);
+  const canWiden = inside.length > NEAREST_COUNT;
+  if (!canWiden) wide = false;
+  const shown = wide ? inside : ranked.slice(0, NEAREST_COUNT);
+
+  const sum = $("summary");
+  sum.hidden = !wide;
+  if (wide) sum.innerHTML = `半径${RADIUS_KM}km以内に<b>${inside.length}</b>か所あります`;
+
+  const more = $("more");
+  more.hidden = !canWiden;
+  more.setAttribute("aria-expanded", String(wide));
+  more.textContent = wide
+    ? `近い${NEAREST_COUNT}か所だけ表示`
+    : `半径${RADIUS_KM}km以内の${inside.length}か所をすべて表示`;
+
   const ol = $("results");
   ol.innerHTML = "";
-  ranked.forEach((s, i) => {
+  shown.forEach((s, i) => {
     const li = document.createElement("li");
     const dest = s.a ? encodeURIComponent(s.a.replace(/[((][^))]*[))]/g, "")) : s.lat + "," + s.lng;
     const route = "https://www.google.com/maps/dir/?api=1&origin=" + origin.lat + "," + origin.lng + "&destination=" + dest;
@@ -643,7 +737,9 @@ function showNearest(origin, originLabel){
     ol.appendChild(li);
   });
   $("origin").textContent = "検索地点:" + originLabel;
-  const markers = drawResults(origin, originLabel, ranked) || [];
+  $("printmeta").textContent = wide ? `直線距離・半径${RADIUS_KM}km以内・近い順` : `直線距離・近い${NEAREST_COUNT}か所`;
+  $("print").hidden = false;
+  const markers = drawResults(origin, originLabel, shown, wide) || [];
   [...ol.children].forEach((li, i) => {
     if (!markers[i]) return;
     li.classList.add("clickable");
@@ -654,7 +750,11 @@ function showNearest(origin, originLabel){
       if (window.matchMedia("(max-width:820px)").matches) $("map").scrollIntoView({ behavior: "smooth" });
     });
   });
-  setStatus("");
+}
+
+function toggleWide(){
+  wide = !wide;
+  render();
 }
 
 async function searchAddress(){
@@ -683,7 +783,123 @@ function searchHere(){
 
 $("go").addEventListener("click", searchAddress);
 $("here").addEventListener("click", searchHere);
+$("more").addEventListener("click", toggleWide);
 $("q").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing && !$("go").disabled) searchAddress(); });
+/* ===== 印刷(A4横1枚に収める) ===== */
+// 上から順に試し、一覧が1枚に収まった時点の [列数, 文字サイズ(pt)] を使う
+// [列数, 文字サイズ(pt), 地図の幅(mm)]
+const PRINT_SIZES = [[1,10,155],[1,9,155],[2,8.5,150],[2,8,145],[2,7.5,140],[2,7,130],[3,7,115],[3,6.5,110],[3,6,105],[3,5.5,100],[3,5,95]];
+function fitListForPrint(){
+  const side = document.querySelector(".side");
+  for (const [cols, pt, mapMm] of PRINT_SIZES){
+    document.body.style.setProperty("--pmap", mapMm + "mm");
+    side.style.setProperty("--pcols", cols);
+    side.style.setProperty("--pfs", pt + "pt");
+    if (side.scrollHeight <= side.clientHeight + 1) return;
+  }
+}
+function refitMap(padding){
+  if (!map) return;
+  map.invalidateSize(false);
+  if (lastBounds) map.fitBounds(lastBounds, { padding, maxZoom: lastMaxZoom, animate: false });
+}
+// 印刷用の地図は小さいためズームが引き気味になり、ベクトル地図が地名の少ない広域用データに切り替わってしまう。
+// そこで地図を一回り大きく描いてから縮小し、地名の入った詳しいデータ(この値以上のズーム)を使う。
+const PRINT_MIN_ZOOM = 12.25;
+const PRINT_MAX_SCALE = 1.7; // 縮小しすぎると文字が小さくなるため上限を設ける
+function resetPrintMapScale(){
+  const el = $("map");
+  el.style.width = ""; el.style.height = ""; el.style.transform = ""; el.style.transformOrigin = "";
+}
+function fitPrintMap(){
+  if (!map) return;
+  resetPrintMapScale();
+  map.invalidateSize(false);
+  if (!lastBounds) return;
+  const el = $("map");
+  const z = map.getBoundsZoom(lastBounds, false, L.point(12, 12));
+  if (glLayer && z < PRINT_MIN_ZOOM){
+    const k = Math.min(Math.pow(2, PRINT_MIN_ZOOM - z), PRINT_MAX_SCALE);
+    const w = el.clientWidth, h = el.clientHeight;
+    el.style.width = (w * k) + "px";
+    el.style.height = (h * k) + "px";
+    el.style.transformOrigin = "0 0";
+    el.style.transform = `scale(${1 / k})`;
+    map.invalidateSize(false);
+    map.fitBounds(lastBounds, { padding: [6 * k, 6 * k], maxZoom: lastMaxZoom, animate: false });
+  } else {
+    map.fitBounds(lastBounds, { padding: [6, 6], maxZoom: lastMaxZoom, animate: false });
+  }
+}
+function enterPrintMode(){
+  document.body.classList.add("printing");
+  fitListForPrint();
+  fitPrintMap();
+}
+function exitPrintMode(){
+  if (!document.body.classList.contains("printing")) return;
+  document.body.classList.remove("printing");
+  removeSnapshot();
+  resetPrintMapScale();
+  const side = document.querySelector(".side");
+  side.style.removeProperty("--pcols"); side.style.removeProperty("--pfs");
+  document.body.style.removeProperty("--pmap");
+  refitMap(lastPad);
+}
+function waitForTiles(){
+  return new Promise(resolve => {
+    let done = false;
+    const finish = () => { if (!done){ done = true; resolve(); } };
+    const gm = glLayer && glLayer.getMaplibreMap && glLayer.getMaplibreMap();
+    if (gm){
+      setTimeout(() => { if (gm.loaded() && gm.areTilesLoaded()) finish(); else gm.once("idle", finish); }, 400);
+      setTimeout(finish, 8000);
+      return;
+    }
+    if (!tiles) return finish();
+    tiles.once("load", finish);
+    setTimeout(() => { if (!tiles.isLoading()) finish(); }, 400);
+    setTimeout(finish, 5000);
+  });
+}
+// 描き終わった地図を画像に写し取り、印刷中に描き直されても地名が消えないようにする
+function snapshotMap(){
+  const gm = glLayer && glLayer.getMaplibreMap && glLayer.getMaplibreMap();
+  if (!gm) return;
+  try {
+    gm.triggerRepaint();
+    const c = gm.getCanvas();
+    const img = document.createElement("img");
+    img.className = "print-snapshot";
+    img.alt = "";
+    img.src = c.toDataURL("image/png");
+    img.style.width = c.style.width || (c.clientWidth + "px");
+    img.style.height = c.style.height || (c.clientHeight + "px");
+    img.style.left = c.offsetLeft + "px";
+    img.style.top = c.offsetTop + "px";
+    c.parentNode.insertBefore(img, c.nextSibling);
+    document.body.classList.add("has-snapshot");
+  } catch (e) { console.warn("地図を画像にできませんでした:", e); }
+}
+function removeSnapshot(){
+  document.querySelectorAll(".print-snapshot").forEach(el => el.remove());
+  document.body.classList.remove("has-snapshot");
+}
+async function printResults(){
+  const wait = $("printwait");
+  wait.hidden = false;
+  enterPrintMode();
+  await waitForTiles();
+  await new Promise(r => setTimeout(r, 400));
+  snapshotMap();
+  await new Promise(r => setTimeout(r, 150));
+  wait.hidden = true;
+  window.print();
+}
+window.addEventListener("beforeprint", () => { if (!document.body.classList.contains("printing")) enterPrintMode(); });
+window.addEventListener("afterprint", exitPrintMode);
+$("print").addEventListener("click", printResults);
+
 initMap();
 loadStations();
 </script>
