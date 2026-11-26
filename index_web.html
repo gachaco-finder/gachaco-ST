@@ -5,6 +5,9 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>最寄りのGachacoステーションを探します</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap">
 <style>
 :root{
   --bg:transparent; --panel:#ffffff; --ink:#1f2419; --muted:#5f6657;
@@ -15,9 +18,10 @@
   padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
 }
 *,*::before,*::after{box-sizing:inherit}
+.leaflet-container,.leaflet-popup-content{font-family:inherit}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);
-  font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  font-family:"Noto Sans JP","Hiragino Sans","Hiragino Kaku Gothic ProN","Meiryo",sans-serif;
   line-height:1.6}
 main{height:calc(100% - 6px);display:grid;grid-template-columns:minmax(340px,460px) 1fr;gap:20px;padding:20px;}
 .side{display:flex;flex-direction:column;min-height:0;overflow-y:auto;padding:4px 8px;}
